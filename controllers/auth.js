@@ -263,6 +263,7 @@ export const verifyOTPController = async (req, res) => {
     // Sorting by createdAt descending ensures we check the latest OTP first.
     // (Note: OTPModel should have timestamps enabled to use createdAt.)
     const isExist = await OTPModel.findOne({ email, isUsed: false }).sort({ createdAt: -1 });
+    console.log(isExist);
 
     // If no OTP record exists, it's invalid
     if (!isExist) {
@@ -272,7 +273,14 @@ export const verifyOTPController = async (req, res) => {
         data: null
       });
     }
-
+    if (isExist.otp !== otp) {
+      return res.json({
+        message: "Invalid OTP",
+        status: "failed",
+        data: null
+      });
+    }
+    
     // If an OTP record exists, mark it as used
     // and update the corresponding user as verified
     await OTPModel.findByIdAndUpdate(isExist._id, { isUsed: true });
