@@ -35,10 +35,20 @@ function OTPVerification() {
         
     };
 
-    const handleResendOTP = () => {
+    const handleResendOTP = async() => {
         setIsResending(true);
         setMessage("");
-        console.log("Resending OTP to:", email);
+        try {
+            const URL="http://localhost:3000/api/resend-otp";
+            const res=  await axios.post(URL, { email })
+              setMessage("OTP resent successfully!");
+              setIsResending(false);
+            
+        } catch (error) {
+            setMessage("Failed to resend OTP. Please try again.");
+            console.error("Error during resending OTP:", error.message);
+        }
+        // console.log("Resending OTP to:", email);
         // Add your API call here
         // Don't forget to set setIsResending(false) after API call completes
     };
