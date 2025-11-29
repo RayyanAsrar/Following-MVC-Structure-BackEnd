@@ -58,14 +58,6 @@ export const signupController = async (req, res) => {
     // Create the user document in MongoDB
     await UserModel.create(body);
 
-    // Respond early that the user was created successfully
-    // Note: we still attempt to send the OTP email after this response
-    res.json({
-      message: "User signed up successfully",
-      status: "success",
-      data: req.body
-    });
-
     // --- Generate OTP and send welcome/verification email ---
     // We create a short OTP using uuidv4 and slice it to 6 chars.
     // In production you may prefer a numeric OTP or a securely-generated token.
@@ -158,13 +150,20 @@ export const signupController = async (req, res) => {
       };
       await OTPModel.create(otpObj);
 
+      // Respond after successful OTP email send
+      res.json({
+        message: "User signed up successfully. OTP sent to email.",
+        status: "success",
+        data: { name, email }
+      });
+
     } catch (error) {
       // If sending the email fails, the user was already created. We return success
       // because account creation succeeded, but note the mail failure for debugging.
       res.json({
         message: "User signed up but failed to send welcome email",
         status: "success",
-        data: null
+        data: { name, email }
       });
     }
 
@@ -280,7 +279,7 @@ export const verifyOTPController = async (req, res) => {
         data: null
       });
     }
-    
+
     // If an OTP record exists, mark it as used
     // and update the corresponding user as verified
     await OTPModel.findByIdAndUpdate(isExist._id, { isUsed: true });
