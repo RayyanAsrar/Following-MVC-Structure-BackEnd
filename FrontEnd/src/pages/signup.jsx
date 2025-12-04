@@ -66,6 +66,9 @@ function Signup() {
                         Create Account
                     </button>
                 </form>
+                <p className="text-center text-sm text-gray-600 mt-4">
+                    Already have an account? <button type="button" onClick={() => navigate('/login')} className="text-blue-600 hover:underline">Login</button>
+                </p>
             </div>
         </div>
     );

@@ -1,4 +1,6 @@
+import axios from "axios";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 function ChangePassword() {
     const [formData, setFormData] = useState({
@@ -6,8 +8,9 @@ function ChangePassword() {
         confirmPassword: ""
     });
     const [error, setError] = useState("");
+    const [searchParams] = useSearchParams()
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async(e) => {
         e.preventDefault();
         setError("");
 
@@ -17,16 +20,27 @@ function ChangePassword() {
             return;
         }
 
-        if (formData.newPassword.length < 6) {
-            setError("Password must be at least 6 characters!");
-            return;
-        }
-
+  
         console.log("Change password payload:", { 
             newPassword: formData.newPassword 
         });
-        // Add your API call here
-        // After success: navigate("/login")
+       
+        const token = searchParams.get("token");
+    //    console.log(token);
+    try {
+        const res = await axios.post("http://localhost:3000/api/changepassword", {
+            newPassword: formData.newPassword,
+            token: token
+        });
+        console.log("Change password response:", res.data);
+    } catch (err) {
+        setError(err.response?.data?.message || "Failed to change password");
+        console.error("Change password error:", err);
+    }
+        console.log("Change password response:", res.data);
+        // console.log(searchParams);
+        
+
     };
 
     return (

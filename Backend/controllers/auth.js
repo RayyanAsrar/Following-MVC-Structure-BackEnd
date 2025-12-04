@@ -387,7 +387,70 @@ export const forgetPasswordController = async (req, res) => {
       });
     }
 
+    const token = jwt.sign({ _id: user._id,email:email }, process.env.JWT_SECRET, { expiresIn: "5m" });
+    
+    const resetLink = `http://localhost:5173/change-password?token=${token}`;
+
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.APP_PASS,
+      },
+    });
+    await transporter.sendMail({
+      from: process.env.EMAIL,
+      to: email,
+      subject: "Password Reset Request",
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link is valid for 5 minutes.</p>`
+    });
+    res.json({
+      message: "Password reset link sent to email",
+      status: "success",
+    });
+
   } catch (error) {
+     res.json({
+      message: error.message || "Error in signup controller",
+      status: "failed",
+      data: null
+    });
+  }
+}
+export const changePasswordController = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.json({
+        message: "Token and new password are required",
+        status: "failed",
+        data: null
+      });
+      
+    }
+    const isVerifiedToken=jwt.verify(token,process.env.JWT_SECRET);
+    // console.log(isVerifiedToken);
+    if(!isVerifiedToken.email || !isVerifiedToken._id){
+      return res.json({
+        message: "Invalid or expired token",
+        status: "failed",
+        data: null
+      });
+    }
+    const hashPassword = await bcrypt.hash(newPassword, 10);
+    await UserModel.findByIdAndUpdate(isVerifiedToken._id, { password: hashPassword });
+
+    res.json({
+      message: "Password changed successfully",
+      status: "success",
+    }); 
+    
+    
+  }
+  catch (error) {
      res.json({
       message: error.message || "Error in signup controller",
       status: "failed",
