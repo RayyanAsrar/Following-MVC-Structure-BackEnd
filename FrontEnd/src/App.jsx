@@ -4,6 +4,7 @@ import  Login  from "./pages/login";
 import OTPVerification from "./pages/otpverificationpage";
 import ChangePassword from "./pages/changepassword";
 import ForgotPassword from "./pages/forgetPassword";
+import Dasboard from "./pages/dashboard";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/otp-verify-pg" element={<OTPVerification />} />
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/forget-password" element={<ForgotPassword/>}/>
+        <Route path="/dashboard" element={<Dasboard/>} />
       </Routes>
     </BrowserRouter>
   );

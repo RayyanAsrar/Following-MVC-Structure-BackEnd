@@ -1,37 +1,30 @@
-//i have added comments to the code using co pilot for better understanding********
-
-
-import { UserModel } from "../models/userSchema.js"; 
-import bcrypt from "bcryptjs"; 
-import jwt from "jsonwebtoken"; 
-import dotenv from "dotenv"; 
-import nodemailer from "nodemailer"; 
-import { v4 as uuidv4 } from 'uuid'; 
-import OTPModel from "../models/otp.js"; 
+import { UserModel } from "../models/userSchema.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+import nodemailer from "nodemailer";
+import { v4 as uuidv4 } from 'uuid';
+import OTPModel from "../models/otp.js";
 
 dotenv.config();
 
-
 export const signupController = async (req, res) => {
   try {
-  
     const { name, email, mobileNumber, password } = req.body;
 
-   
     if (!name || !email || !mobileNumber || !password) {
-     
-      return res.json({
-        message: "All fields are required",
-        status: "failed",
+      return res.status(400).json({
+        success: false,
+        message: "Please provide all required fields: name, email, mobile number, and password",
         data: null
       });
     }
 
     const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
-      return res.json({
-        message: "User already exists with this email",
-        status: "failed",
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email address already exists. Please login instead.",
         data: null
       });
     }
@@ -44,11 +37,9 @@ export const signupController = async (req, res) => {
 
     await UserModel.create(body);
 
-
     const otp = uuidv4().slice(0, 6);
 
     try {
-
       const transporter = nodemailer.createTransport({
         service: "Gmail",
         host: "smtp.gmail.com",
@@ -60,12 +51,10 @@ export const signupController = async (req, res) => {
         },
       });
 
-
       await transporter.sendMail({
         from: process.env.EMAIL,
         to: email,
         subject: "Welcome to Our Platform!",
-     
         html: `<!doctype html>
                 <html>
                 <head>
@@ -73,7 +62,6 @@ export const signupController = async (req, res) => {
   <meta name="viewport" content="width=device-width">
   <title>Verify your email</title>
   <style>
-    /* Minimal inline-friendly styles used below where needed. */
     body { margin: 0; padding: 0; background: #f4f6f8; }
     .container { width: 100%; max-width: 600px; margin: 0 auto; }
   </style>
@@ -98,7 +86,6 @@ export const signupController = async (req, res) => {
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0 28px;">
                 <tr>
                   <td align="center">
-                    <!-- Display OTP clearly inside a styled block so email clients render it -->
                     <button style="display:inline-block;padding:12px 22px;background:#4f46e5;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px;">${otp}</button>
                   </td>
                 </tr>
@@ -124,47 +111,45 @@ export const signupController = async (req, res) => {
               </html>`
       });
 
-
       const otpObj = {
         otp: otp,
         email: email
       };
       await OTPModel.create(otpObj);
 
-
-      res.json({
-        message: "User signed up successfully. OTP sent to email.",
-        status: "success",
+      return res.status(201).json({
+        success: true,
+        message: "Account created successfully. Please check your email for the verification code.",
         data: { name, email }
       });
 
-    } catch (error) {
-    
-      res.json({
-        message: "User signed up but failed to send welcome email",
-        status: "success",
+    } catch (emailError) {
+      console.error("Email sending error:", emailError);
+      return res.status(500).json({
+        success: false,
+        message: "Account created but we couldn't send the verification email. Please request a new OTP.",
         data: { name, email }
       });
     }
 
   } catch (error) {
-    
-    res.json({
-      message: error.message || "Error in signup controller",
-      status: "failed",
+    console.error("Signup error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An unexpected error occurred during signup. Please try again later.",
       data: null
     });
   }
 };
+
 export const loginController = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-  
     if (!email || !password) {
-      return res.json({
-        message: "Email and password are required",
-        status: "failed",
+      return res.status(400).json({
+        success: false,
+        message: "Please provide both email and password to login",
         data: null
       });
     }
@@ -172,111 +157,120 @@ export const loginController = async (req, res) => {
     const user = await UserModel.findOne({ email });
 
     if (!user) {
-      return res.json({
-        message: "User not found",
-        status: "failed",
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email address. Please sign up first.",
         data: null
       });
     }
 
-    const bodytosend = { email: user.email, name: user.name, mobileNumber: user.mobileNumber, _id: user._id };
-
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      return res.json({
-        message: "Invalid password",
-        status: "failed",
+      return res.status(401).json({
+        success: false,
+        message: "Incorrect password. Please try again or reset your password.",
         data: null
       });
     }
 
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-    res.json({
-      message: "User logged in successfully",
-      status: "success",
-      data: bodytosend,
+    const userData = { 
+      email: user.email, 
+      name: user.name, 
+      mobileNumber: user.mobileNumber, 
+      _id: user._id 
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful. Welcome back!",
+      data: userData,
       token: token
     });
+
   } catch (error) {
-    res.json({
-      message: error.message || "something went wrong in login controller",
-      status: "failed",
+    console.error("Login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An unexpected error occurred during login. Please try again later.",
       data: null
     });
   }
 };
+
 export const verifyOTPController = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
     if (!email || !otp) {
-      return res.json({
-        message: "Email and OTP are required",
-        status: "failed",
+      return res.status(400).json({
+        success: false,
+        message: "Please provide both email and OTP for verification",
         data: null
       });
     }
 
-    // Find the most recent unused OTP for this email.
-    // Sorting by createdAt descending ensures we check the latest OTP first.
-    // (Note: OTPModel should have timestamps enabled to use createdAt.)
-    const isExist = await OTPModel.findOne({ email, isUsed: false }).sort({ createdAt: -1 });
-    console.log(isExist);
+    const otpRecord = await OTPModel.findOne({ email, isUsed: false }).sort({ createdAt: -1 });
 
-    if (!isExist) {
-      return res.json({
-        message: "Invalid OTP",
-        status: "failed",
-        data: null
-      });
-    }
-    if (isExist.otp !== otp) {
-      return res.json({
-        message: "Invalid OTP",
-        status: "failed",
+    if (!otpRecord) {
+      return res.status(404).json({
+        success: false,
+        message: "No valid OTP found for this email. Please request a new one.",
         data: null
       });
     }
 
-    await OTPModel.findByIdAndUpdate(isExist._id, { isUsed: true });
+    if (otpRecord.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "The OTP you entered is incorrect. Please check and try again.",
+        data: null
+      });
+    }
+
+    await OTPModel.findByIdAndUpdate(otpRecord._id, { isUsed: true });
     await UserModel.findOneAndUpdate({ email }, { isVerified: true });
 
-    res.json({
-      message: "OTP verified successfully",
-      status: "success",
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully. Your account is now active!",
+      data: null
     });
 
   } catch (error) {
-    res.json({
-      message: error.message || "Error in signup controller",
-      status: "failed",
+    console.error("OTP verification error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An unexpected error occurred during OTP verification. Please try again later.",
       data: null
     });
   }
 };
+
 export const resetOTPController = async (req, res) => {
   try {
     const { email } = req.body;
 
     if (!email) {
-      return res.json({
-        message: "Email and OTP are required",
-        status: "failed",
+      return res.status(400).json({
+        success: false,
+        message: "Please provide your email address to resend OTP",
         data: null
       });
     }
 
     const user = await UserModel.findOne({ email });
     if (!user) {
-      return res.json({
-        message: "User not found",
-        status: "failed",
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email address",
         data: null
       });
     }
 
     const otp = uuidv4().slice(0, 6);
+
     const transporter = nodemailer.createTransport({
       service: "Gmail",
       host: "smtp.gmail.com",
@@ -291,7 +285,7 @@ export const resetOTPController = async (req, res) => {
     await transporter.sendMail({
       from: process.env.EMAIL,
       to: email,
-      subject: "Welcome to Our Platform!",
+      subject: "Your New Verification Code",
       html: `<!doctype html>
                 <html>
                 <head>
@@ -299,7 +293,6 @@ export const resetOTPController = async (req, res) => {
   <meta name="viewport" content="width=device-width">
   <title>Verify your email</title>
   <style>
-    /* Minimal inline-friendly styles used below where needed. */
     body { margin: 0; padding: 0; background: #f4f6f8; }
     .container { width: 100%; max-width: 600px; margin: 0 auto; }
   </style>
@@ -319,7 +312,7 @@ export const resetOTPController = async (req, res) => {
             <td style="padding:28px 24px 12px;font-family:Arial,sans-serif;color:#111827;">
               <p style="margin:0 0 12px;font-size:16px;line-height:1.4;">Hi ${user.name},</p>
 
-              <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#374151;">Thanks for creating an account. Copy the below OTP to verify your email address and activate your account.</p>
+              <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#374151;">Here's your new verification code. Copy the OTP below to verify your email address.</p>
 
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0 28px;">
                 <tr>
@@ -331,7 +324,7 @@ export const resetOTPController = async (req, res) => {
 
               <hr style="border:none;border-top:1px solid #e6e9ee;margin:20px 0;">
 
-              <p style="margin:0;font-size:13px;color:#9ca3af;">If you didn't create an account with us, you can ignore this email.</p>
+              <p style="margin:0;font-size:13px;color:#9ca3af;">If you didn't request this code, you can ignore this email.</p>
             </td>
           </tr>
 
@@ -355,40 +348,49 @@ export const resetOTPController = async (req, res) => {
     };
     await OTPModel.create(otpObj);
 
-    res.json({
-      message: "Reset OTP sent successfully",
-      status: "success",
+    return res.status(200).json({
+      success: true,
+      message: "A new verification code has been sent to your email",
+      data: null
     });
+
   } catch (error) {
-    res.json({
-      message: error.message || "Error in signup controller",
-      status: "failed",
+    console.error("Reset OTP error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send new verification code. Please try again later.",
       data: null
     });
   }
 };
+
 export const forgetPasswordController = async (req, res) => {
   try {
-    const {email} = req.body;
+    const { email } = req.body;
 
     if (!email) {
-      return res.json({
-        message: "Email is required",
-        status: "failed",
-        data: null
-      });
-    }
-    const user = await UserModel.findOne({ email });
-    if (!user) {
-      return res.json({
-        message: "User not found",
-        status: "failed",
+      return res.status(400).json({
+        success: false,
+        message: "Please provide your email address to reset password",
         data: null
       });
     }
 
-    const token = jwt.sign({ _id: user._id,email:email }, process.env.JWT_SECRET, { expiresIn: "5m" });
-    
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email address",
+        data: null
+      });
+    }
+
+    const token = jwt.sign(
+      { _id: user._id, email: email }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: "5m" }
+    );
+
     const resetLink = `http://localhost:5173/change-password?token=${token}`;
 
     const transporter = nodemailer.createTransport({
@@ -401,60 +403,77 @@ export const forgetPasswordController = async (req, res) => {
         pass: process.env.APP_PASS,
       },
     });
+
     await transporter.sendMail({
       from: process.env.EMAIL,
       to: email,
       subject: "Password Reset Request",
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link is valid for 5 minutes.</p>`
+      html: `<p>You requested to reset your password. Click <a href="${resetLink}">here</a> to reset your password. This link will expire in 5 minutes.</p>
+             <p>If you didn't request this, please ignore this email and your password will remain unchanged.</p>`
     });
-    res.json({
-      message: "Password reset link sent to email",
-      status: "success",
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset link has been sent to your email. Please check your inbox.",
+      data: null
     });
 
   } catch (error) {
-     res.json({
-      message: error.message || "Error in signup controller",
-      status: "failed",
+    console.error("Forget password error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send password reset email. Please try again later.",
       data: null
     });
   }
-}
+};
+
 export const changePasswordController = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
-    if (!token || !newPassword) {
-      return res.json({
-        message: "Token and new password are required",
-        status: "failed",
-        data: null
-      });
-      
-    }
-    const isVerifiedToken=jwt.verify(token,process.env.JWT_SECRET);
-    // console.log(isVerifiedToken);
-    if(!isVerifiedToken.email || !isVerifiedToken._id){
-      return res.json({
-        message: "Invalid or expired token",
-        status: "failed",
-        data: null
-      });
-    }
-    const hashPassword = await bcrypt.hash(newPassword, 10);
-    await UserModel.findByIdAndUpdate(isVerifiedToken._id, { password: hashPassword });
 
-    res.json({
-      message: "Password changed successfully",
-      status: "success",
-    }); 
-    
-    
-  }
-  catch (error) {
-     res.json({
-      message: error.message || "Error in signup controller",
-      status: "failed",
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide both reset token and new password",
+        data: null
+      });
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtError) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired reset token. Please request a new password reset link.",
+        data: null
+      });
+    }
+
+    if (!decodedToken.email || !decodedToken._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token data. Please request a new password reset link.",
+        data: null
+      });
+    }
+
+    const hashPassword = await bcrypt.hash(newPassword, 10);
+    await UserModel.findByIdAndUpdate(decodedToken._id, { password: hashPassword });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully. You can now login with your new password.",
+      data: null
+    });
+
+  } catch (error) {
+    console.error("Change password error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reset password. Please try again later.",
       data: null
     });
   }
-}
+};
